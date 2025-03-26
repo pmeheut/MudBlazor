@@ -179,65 +179,79 @@ namespace MudBlazor
         internal static bool RenderedColumnsItemsSelector(Column<T> item, string dropZone) =>
             item?.PropertyName == dropZone;
 
-        public IEnumerable<ColumnState> GetColumnStates()
+        public List<ColumnState> GetColumnStates()
         {
             return RenderedColumns.Select(c =>
-                new ColumnState(c.PropertyName, c.Hidden, GetColumnSortDirection(c.PropertyName), c.HeaderCell.Width));
+                    new ColumnState(c.PropertyName, c.Hidden, GetColumnSortDirection(c.PropertyName),
+                        c.HeaderCell.Width))
+                .ToList();
         }
 
-        public async void SetColumnsStateAsync(IEnumerable<ColumnState> columnStates)
+        public async void SetColumnsStateAsync(List<ColumnState> columnStates)
         {
             if (columnStates == null)
                 return;
 
             var renderedColumnsByName = new Dictionary<string, Column<T>>();
-            var renderedColumnsNotFound = new List<Column<T>>();
-            var orderedColumns = new List<Column<T>>();
             foreach (var column in RenderedColumns)
             {
                 renderedColumnsByName[column.PropertyName] = column;
             }
 
-            foreach (var c in columnStates)
+            var renderedColumnsFound = new HashSet<Column<T>>();
+            var orderedColumns = new List<Column<T>>();
+
+            foreach (var columnState in columnStates)
             {
-                if()
+                if (renderedColumnsByName.TryGetValue(columnState.Name, out var value))
+                {
+                    orderedColumns.Add(value);
+                    renderedColumnsFound.Add(value);
+                }
             }
-            
-            
+
+            foreach (var column in RenderedColumns)
+            {
+                if (!renderedColumnsFound.Contains(column))
+                {
+                    orderedColumns.Add(column);
+                }
+            }
+
+            RenderedColumns.Clear();
+            RenderedColumns.AddRange(orderedColumns);
+
             // TODO: set order, call methods to set width, hidden, sort direction and avoid events
             foreach (var state in columnStates)
             {
-                var column = RenderedColumns.FirstOrDefault(c => c.PropertyName == state.Name);
-                if (column != null)
+                var column = renderedColumnsByName[state.Name];
+                // Update hidden state
+                if (state.Hidden)
                 {
-                    // Update hidden state
-                    if (state.Hidden)
-                    {
-                        await column.HiddenState.SetValueAsync(true);
-                    }
-                    else
-                    {
-                        await column.HiddenState.SetValueAsync(false);
-                    }
+                    await column.HiddenState.SetValueAsync(true);
+                }
+                else
+                {
+                    await column.HiddenState.SetValueAsync(false);
+                }
 
-                    // Update width
-                    if (state.Width.HasValue)
-                    {
-                        column.HeaderCell.Width = state.Width;
-                    }
+                // Update width
+                if (state.Width.HasValue)
+                {
+                    column.HeaderCell.Width = state.Width;
+                }
 
-                    // Update sort direction
+                // Update sort direction
+                if (state.SortDirection != SortDirection.None)
+                {
+                    // Remove existing sort definition if it exists
+                    SortDefinitions.Remove(state.Name);
+
+                    // Add new sort definition if not None
                     if (state.SortDirection != SortDirection.None)
                     {
-                        // Remove existing sort definition if it exists
-                        SortDefinitions.Remove(state.Name);
-
-                        // Add new sort definition if not None
-                        if (state.SortDirection != SortDirection.None)
-                        {
-                            await SetSortAsync(column.PropertyName, state.SortDirection, column.GetLocalSortFunc(),
-                                column.Comparer);
-                        }
+                        await SetSortAsync(column.PropertyName, state.SortDirection, column.GetLocalSortFunc(),
+                            column.Comparer);
                     }
                 }
             }
@@ -391,7 +405,6 @@ namespace MudBlazor
         /// </remarks>
         [Parameter]
         public EventCallback<ColumnsStateEvent> ColumnsStateChanged { get; set; }
-
 
         #endregion
 
@@ -2273,7 +2286,7 @@ namespace MudBlazor
             GC.SuppressFinalize(this);
         }
 
-        
+
         protected virtual void Dispose(bool disposing)
         {
             _serverDataCancellationTokenSource?.Dispose();
