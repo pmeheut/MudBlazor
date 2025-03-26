@@ -675,7 +675,7 @@ namespace MudBlazor
         /// </summary>
         public Task HideAsync()
         {
-            return HiddenState.SetValueAsync(true);
+            return HiddenState.SetValueAsync(true).ContinueWith(task => DataGrid.FireColumnsStateChangedAsync());
         }
 
         /// <summary>
@@ -683,7 +683,7 @@ namespace MudBlazor
         /// </summary>
         public Task ShowAsync()
         {
-            return HiddenState.SetValueAsync(false);
+            return HiddenState.SetValueAsync(false).ContinueWith(task => DataGrid.FireColumnsStateChangedAsync());
         }
 
         /// <summary>
@@ -693,6 +693,7 @@ namespace MudBlazor
         {
             await HiddenState.SetValueAsync(!HiddenState.Value);
             ((IMudStateHasChanged)DataGrid).StateHasChanged();
+            await DataGrid.FireColumnsStateChangedAsync();
         }
 
         /// <summary>

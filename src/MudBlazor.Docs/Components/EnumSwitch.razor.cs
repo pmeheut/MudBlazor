@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Components;
 
 namespace MudBlazor.Docs.Components;
 
-public partial class EnumSwitch<T>
+public partial class EnumSwitch<TEnum>
 {
-    private T _value;
+    private TEnum _value;
 
     [Parameter]
-    public T Value
+    public TEnum Value
     {
         get => _value;
         set
@@ -19,7 +19,7 @@ public partial class EnumSwitch<T>
         }
     }
 
-    [Parameter] public EventCallback<T> ValueChanged { get; set; }
+    [Parameter] public EventCallback<TEnum> ValueChanged { get; set; }
 
-    private Type Type => typeof(T);
+    private Type Type => typeof(TEnum);
 }

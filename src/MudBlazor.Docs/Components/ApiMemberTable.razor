@@ -43,7 +43,8 @@
                               Placeholder="Search members" />
 
                 <div class="docs-content-api-table-toolbar-configuration-container">
-                    @if (true || HasProtected())
+                    @* @if (true || HasProtected()) *@
+                    if(true)
                     {
                         @* There are protected members.  Show a "Show Protected" switch *@
                         <MudSwitch T="bool"

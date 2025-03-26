@@ -1,4 +1,4 @@
-﻿// Copyright (c) MudBlazor 2021
+// Copyright (c) MudBlazor 2021
 // MudBlazor licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -19,7 +19,9 @@ namespace MudBlazor
     /// </summary>
     /// <typeparam name="T">The type of data represented by each row in this grid.</typeparam>
     [CascadingTypeParameter(nameof(T))]
-    public partial class MudDataGrid<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T> : MudComponentBase, IDisposable
+    public partial class
+        MudDataGrid<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T> : MudComponentBase,
+        IDisposable
     {
         private T _selectedItem;
         private MudForm _editForm;
@@ -74,7 +76,8 @@ namespace MudBlazor
             new StyleBuilder()
                 .AddStyle("height", Height, !string.IsNullOrWhiteSpace(Height))
                 .AddStyle("width", "max-content", when: HorizontalScrollbar || ColumnResizeMode == ResizeMode.Container)
-                .AddStyle("overflow", "clip", when: (HorizontalScrollbar || ColumnResizeMode == ResizeMode.Container) && HasStickyColumns)
+                .AddStyle("overflow", "clip",
+                    when: (HorizontalScrollbar || ColumnResizeMode == ResizeMode.Container) && HasStickyColumns)
                 .AddStyle("display", "block", when: HorizontalScrollbar)
                 .Build();
 
@@ -109,12 +112,14 @@ namespace MudBlazor
                         $"{GetType()} can only accept one item source from its parameters. " +
                         $"Do not supply both '{nameof(Items)}' and '{nameof(ServerData)}'.");
                 }
+
                 if (VirtualizeServerData != null)
                 {
                     throw new InvalidOperationException(
                         $"{GetType()} can only accept one item source from its parameters. " +
                         $"Do not supply both '{nameof(Items)}' and '{nameof(VirtualizeServerData)}'.");
                 }
+
                 return;
             }
 
@@ -126,11 +131,13 @@ namespace MudBlazor
                         $"{GetType()} can only accept one item source from its parameters. " +
                         $"Do not supply both '{nameof(VirtualizeServerData)}' and '{nameof(ServerData)}'.");
                 }
+
                 if (QuickFilter != null)
                 {
                     throw new InvalidOperationException(
                         $"Do not supply both '{nameof(VirtualizeServerData)}' and '{nameof(QuickFilter)}'.");
                 }
+
                 return;
             }
 
@@ -169,7 +176,80 @@ namespace MudBlazor
             }
         }
 
-        internal static bool RenderedColumnsItemsSelector(Column<T> item, string dropZone) => item?.PropertyName == dropZone;
+        internal static bool RenderedColumnsItemsSelector(Column<T> item, string dropZone) =>
+            item?.PropertyName == dropZone;
+
+        public IEnumerable<ColumnState> GetColumnStates()
+        {
+            return RenderedColumns.Select(c =>
+                new ColumnState(c.PropertyName, c.Hidden, GetColumnSortDirection(c.PropertyName), c.HeaderCell.Width));
+        }
+
+        public async void SetColumnsStateAsync(IEnumerable<ColumnState> columnStates)
+        {
+            if (columnStates == null)
+                return;
+
+            var renderedColumnsByName = new Dictionary<string, Column<T>>();
+            var renderedColumnsNotFound = new List<Column<T>>();
+            var orderedColumns = new List<Column<T>>();
+            foreach (var column in RenderedColumns)
+            {
+                renderedColumnsByName[column.PropertyName] = column;
+            }
+
+            foreach (var c in columnStates)
+            {
+                if()
+            }
+            
+            
+            // TODO: set order, call methods to set width, hidden, sort direction and avoid events
+            foreach (var state in columnStates)
+            {
+                var column = RenderedColumns.FirstOrDefault(c => c.PropertyName == state.Name);
+                if (column != null)
+                {
+                    // Update hidden state
+                    if (state.Hidden)
+                    {
+                        await column.HiddenState.SetValueAsync(true);
+                    }
+                    else
+                    {
+                        await column.HiddenState.SetValueAsync(false);
+                    }
+
+                    // Update width
+                    if (state.Width.HasValue)
+                    {
+                        column.HeaderCell.Width = state.Width;
+                    }
+
+                    // Update sort direction
+                    if (state.SortDirection != SortDirection.None)
+                    {
+                        // Remove existing sort definition if it exists
+                        SortDefinitions.Remove(state.Name);
+
+                        // Add new sort definition if not None
+                        if (state.SortDirection != SortDirection.None)
+                        {
+                            await SetSortAsync(column.PropertyName, state.SortDirection, column.GetLocalSortFunc(),
+                                column.Comparer);
+                        }
+                    }
+                }
+            }
+
+            // Refresh the UI
+            StateHasChanged();
+        }
+
+        internal Task FireColumnsStateChangedAsync()
+        {
+            return ColumnsStateChanged.InvokeAsync(new ColumnsStateEvent());
+        }
 
         private static void Swap<TItem>(List<TItem> list, int indexA, int indexB)
         {
@@ -182,8 +262,10 @@ namespace MudBlazor
         {
             dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
 
-            var dragAndDropSource = RenderedColumns.SingleOrDefault(rc => rc.PropertyName == dropItem.Item.PropertyName);
-            var dragAndDropDestination = RenderedColumns.SingleOrDefault(rc => rc.PropertyName == dropItem.DropzoneIdentifier);
+            var dragAndDropSource =
+                RenderedColumns.SingleOrDefault(rc => rc.PropertyName == dropItem.Item.PropertyName);
+            var dragAndDropDestination =
+                RenderedColumns.SingleOrDefault(rc => rc.PropertyName == dropItem.DropzoneIdentifier);
             if (dragAndDropSource != null && dragAndDropDestination != null)
             {
                 var dragAndDropSourceIndex = RenderedColumns.IndexOf(dragAndDropSource);
@@ -199,7 +281,9 @@ namespace MudBlazor
                 dragAndDropDestination.HeaderCell.Width = src;
 
                 StateHasChanged();
+                return FireColumnsStateChangedAsync();
             }
+
             return Task.CompletedTask;
         }
 
@@ -219,8 +303,7 @@ namespace MudBlazor
         // converters
         private Converter<bool, bool?> _oppositeBoolConverter = new Converter<bool, bool?>
         {
-            SetFunc = value => !value,
-            GetFunc = value => !value ?? true,
+            SetFunc = value => !value, GetFunc = value => !value ?? true,
         };
 
         #region Notify Children Delegates
@@ -299,6 +382,16 @@ namespace MudBlazor
         /// </remarks>
         [Parameter]
         public EventCallback<FormFieldChangedEventArgs> FormFieldChanged { get; set; }
+
+        /// <summary>
+        /// Occurs when the columns state changes 
+        /// </summary>
+        /// <remarks>
+        /// This can be due to their order, visibility, width, or sort direction.
+        /// </remarks>
+        [Parameter]
+        public EventCallback<ColumnsStateEvent> ColumnsStateChanged { get; set; }
+
 
         #endregion
 
@@ -567,7 +660,8 @@ namespace MudBlazor
         /// When using a <see cref="FilterMode"/> of <see cref="DataGridFilterMode.Simple"/>, this property is managed automatically.
         /// </remarks>
         [Parameter]
-        public Dictionary<string, SortDefinition<T>> SortDefinitions { get; set; } = new Dictionary<string, SortDefinition<T>>();
+        public Dictionary<string, SortDefinition<T>> SortDefinitions { get; set; } =
+            new Dictionary<string, SortDefinition<T>>();
 
         /// <summary>
         /// Renders only visible items instead of all items.
@@ -634,7 +728,8 @@ namespace MudBlazor
         /// <remarks>
         /// The function passes the current item and row index as parameters.
         /// </remarks>
-        [Parameter] public Func<T, int, string> RowStyleFunc { get; set; }
+        [Parameter]
+        public Func<T, int, string> RowStyleFunc { get; set; }
 
         /// <summary>
         /// Allows selection of more than one row.
@@ -974,6 +1069,7 @@ namespace MudBlazor
                 }
                 else
                     Selection = value;
+
                 SelectedItemsChangedEvent?.Invoke(Selection);
                 SelectedItemsChanged.InvokeAsync(Selection);
                 InvokeAsync(StateHasChanged);
@@ -1179,8 +1275,10 @@ namespace MudBlazor
                     }
                 }
 
-                _currentRenderFilteredItemsCache = Sort(items).ToList(); // To list to ensure evaluation only once per render
+                _currentRenderFilteredItemsCache =
+                    Sort(items).ToList(); // To list to ensure evaluation only once per render
                 unchecked { FilteringRunCount++; }
+
                 GroupItems(noStateChange: true);
                 return _currentRenderFilteredItemsCache;
             }
@@ -1213,6 +1311,7 @@ namespace MudBlazor
             {
                 return Icons.Material.Filled.ExpandMore;
             }
+
             return rtl ? Icons.Material.Filled.ChevronLeft : Icons.Material.Filled.ChevronRight;
         }
 
@@ -1367,6 +1466,7 @@ namespace MudBlazor
                 StateHasChanged();
                 PagerStateHasChangedEvent?.Invoke();
             }
+
             GroupItems();
         }
 
@@ -1400,7 +1500,10 @@ namespace MudBlazor
             {
                 _serverDataCancellationTokenSource?.Cancel();
             }
-            catch { /*ignored*/ }
+            catch
+            {
+                /*ignored*/
+            }
             finally
             {
                 _serverDataCancellationTokenSource = new CancellationTokenSource();
@@ -1420,7 +1523,8 @@ namespace MudBlazor
         /// <summary>
         /// Specifies the default <see cref="IFilterDefinition{T}"/> to be used by <see cref="AddFilter"/> and <see cref="Column{T}.FilterContext"/>.
         /// </summary>
-        public void SetDefaultFilterDefinition<TFilterDefinition>() where TFilterDefinition : IFilterDefinition<T>, new()
+        public void SetDefaultFilterDefinition<TFilterDefinition>()
+            where TFilterDefinition : IFilterDefinition<T>, new()
         {
             SetDefaultFilterDefinition(() => new TFilterDefinition());
         }
@@ -1475,6 +1579,7 @@ namespace MudBlazor
             {
                 FilterDefinitions.Add(definition);
             }
+
             _filtersMenuVisible = true;
             await InvokeServerLoadFunc();
             if (!HasServerData) StateHasChanged();
@@ -1537,8 +1642,8 @@ namespace MudBlazor
         internal async Task SetSelectAllAsync(bool value)
         {
             var items = HasServerData
-                    ? ServerItems
-                    : FilteredItems;
+                ? ServerItems
+                : FilteredItems;
 
             if (value)
                 Selection = new HashSet<T>(items, Comparer);
@@ -1562,13 +1667,17 @@ namespace MudBlazor
 
             IOrderedEnumerable<T> orderedEnumerable = null;
 
-            foreach (var sortDefinition in SortDefinitions.Values.Where(sd => sd.SortFunc != null).OrderBy(sd => sd.Index))
+            foreach (var sortDefinition in SortDefinitions.Values.Where(sd => sd.SortFunc != null)
+                         .OrderBy(sd => sd.Index))
             {
                 if (null == orderedEnumerable)
-                    orderedEnumerable = sortDefinition.Descending ? items.OrderByDescending(item => sortDefinition.SortFunc(item), sortDefinition.Comparer)
+                    orderedEnumerable = sortDefinition.Descending
+                        ? items.OrderByDescending(item => sortDefinition.SortFunc(item), sortDefinition.Comparer)
                         : items.OrderBy(item => sortDefinition.SortFunc(item), sortDefinition.Comparer);
                 else
-                    orderedEnumerable = sortDefinition.Descending ? orderedEnumerable.ThenByDescending(item => sortDefinition.SortFunc(item), sortDefinition.Comparer)
+                    orderedEnumerable = sortDefinition.Descending
+                        ? orderedEnumerable.ThenByDescending(item => sortDefinition.SortFunc(item),
+                            sortDefinition.Comparer)
                         : orderedEnumerable.ThenBy(item => sortDefinition.SortFunc(item), sortDefinition.Comparer);
             }
 
@@ -1709,12 +1818,14 @@ namespace MudBlazor
         /// <param name="direction">The direction to sort results.</param>
         /// <param name="sortFunc">The function which sorts results.</param>
         /// <param name="comparer">The comparer used for custom comparisons.</param>
-        public async Task SetSortAsync(string field, SortDirection direction, Func<T, object> sortFunc, IComparer<object> comparer = null)
+        public async Task SetSortAsync(string field, SortDirection direction, Func<T, object> sortFunc,
+            IComparer<object> comparer = null)
         {
             var removedSortDefinitions = new HashSet<string>(SortDefinitions.Keys);
             SortDefinitions.Clear();
 
-            var newDefinition = new SortDefinition<T>(field, direction == SortDirection.Descending, 0, sortFunc, comparer);
+            var newDefinition =
+                new SortDefinition<T>(field, direction == SortDirection.Descending, 0, sortFunc, comparer);
             SortDefinitions[field] = newDefinition;
 
             // In case sort is just updated make sure to not mark the field as removed
@@ -1733,7 +1844,8 @@ namespace MudBlazor
         /// <remarks>
         /// When the <see cref="SortMode"/> is <see cref="SortMode.Single"/>, this method replaces the sort column.  Otherwise, this sort is appended to any existing sort column.
         /// </remarks>
-        public async Task ExtendSortAsync(string field, SortDirection direction, Func<T, object> sortFunc, IComparer<object> comparer = null)
+        public async Task ExtendSortAsync(string field, SortDirection direction, Func<T, object> sortFunc,
+            IComparer<object> comparer = null)
         {
             // If SortMode is not multiple, use the default set approach and don't extend.
             if (SortMode != SortMode.Multiple)
@@ -1744,10 +1856,14 @@ namespace MudBlazor
 
             // in case it already exists, just update the current entry
             if (SortDefinitions.TryGetValue(field, out var sortDefinition))
-                SortDefinitions[field] = sortDefinition with { Descending = direction == SortDirection.Descending, SortFunc = sortFunc, Comparer = comparer };
+                SortDefinitions[field] = sortDefinition with
+                {
+                    Descending = direction == SortDirection.Descending, SortFunc = sortFunc, Comparer = comparer
+                };
             else
             {
-                var newDefinition = new SortDefinition<T>(field, direction == SortDirection.Descending, SortDefinitions.Count, sortFunc, comparer);
+                var newDefinition = new SortDefinition<T>(field, direction == SortDirection.Descending,
+                    SortDefinitions.Count, sortFunc, comparer);
                 SortDefinitions[field] = newDefinition;
             }
 
@@ -1780,7 +1896,8 @@ namespace MudBlazor
             await InvokeSortUpdates(SortDefinitions, removedSortDefinitions);
         }
 
-        private async Task InvokeSortUpdates(Dictionary<string, SortDefinition<T>> activeSortDefinitions, HashSet<string> removedSortDefinitions)
+        private async Task InvokeSortUpdates(Dictionary<string, SortDefinition<T>> activeSortDefinitions,
+            HashSet<string> removedSortDefinitions)
         {
             SortChangedEvent?.Invoke(activeSortDefinitions, removedSortDefinitions);
 
@@ -1789,6 +1906,7 @@ namespace MudBlazor
                 await InvokeServerLoadFunc();
                 if (!HasServerData)
                     StateHasChanged();
+                await FireColumnsStateChangedAsync();
             }
         }
 
@@ -1933,6 +2051,7 @@ namespace MudBlazor
                 if (column.hideable)
                     await column.HideAsync();
             }
+
             DropContainerHasChanged();
             StateHasChanged();
         }
@@ -1944,6 +2063,7 @@ namespace MudBlazor
                 if (column.hideable)
                     await column.ShowAsync();
             }
+
             DropContainerHasChanged();
             StateHasChanged();
         }
@@ -1971,8 +2091,7 @@ namespace MudBlazor
             RenderedColumns.Remove(dropItem.Item);
             RenderedColumns.Insert(dropItem.IndexInZone, dropItem.Item);
             DropContainerHasChanged();
-
-            return Task.CompletedTask;
+            return FireColumnsStateChangedAsync();
         }
 
         private void ColumnUp(Column<T> column)
@@ -1983,6 +2102,7 @@ namespace MudBlazor
                 RenderedColumns.RemoveAt(index);
                 RenderedColumns.Insert(index - 1, column);
             }
+
             DropContainerHasChanged();
         }
 
@@ -1994,6 +2114,7 @@ namespace MudBlazor
                 RenderedColumns.RemoveAt(index);
                 RenderedColumns.Insert(index + 1, column);
             }
+
             DropContainerHasChanged();
         }
 
@@ -2082,6 +2203,7 @@ namespace MudBlazor
                 group.Expanded = true;
                 _groupExpansionsDict[group.Grouping.Key] = true;
             }
+
             GroupItems();
         }
 
@@ -2098,6 +2220,7 @@ namespace MudBlazor
                 group.Expanded = false;
                 _groupExpansionsDict[group.Grouping.Key] = false;
             }
+
             GroupItems();
         }
 
@@ -2125,10 +2248,12 @@ namespace MudBlazor
         private ElementReference _gridElement;
         private DataGridColumnResizeService<T> _resizeService;
 
-        internal DataGridColumnResizeService<T> ResizeService => _resizeService ??= new DataGridColumnResizeService<T>(this, EventListenerFactory);
+        internal DataGridColumnResizeService<T> ResizeService =>
+            _resizeService ??= new DataGridColumnResizeService<T>(this, EventListenerFactory);
 
         internal async Task<bool> StartResizeColumn(HeaderCell<T> headerCell, double clientX)
-            => await ResizeService.StartResizeColumn(headerCell, clientX, RenderedColumns, ColumnResizeMode, RightToLeft);
+            => await ResizeService.StartResizeColumn(headerCell, clientX, RenderedColumns, ColumnResizeMode,
+                RightToLeft);
 
         internal async Task<double> GetActualHeight()
         {
@@ -2148,6 +2273,7 @@ namespace MudBlazor
             GC.SuppressFinalize(this);
         }
 
+        
         protected virtual void Dispose(bool disposing)
         {
             _serverDataCancellationTokenSource?.Dispose();

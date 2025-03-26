@@ -1,10 +1,10 @@
-﻿@typeparam T where T: Enum
+﻿@typeparam TEnum where TEnum: Enum
 
 <div class="mud-width-full d-flex justify-end">
     <MudButtonGroup OverrideStyles="false">
         @foreach (int value in Enum.GetValues(Type))
         {
-            <MudButton Color="Color.Primary" Size="Size.Small" DropShadow="false" Variant="@(value == Convert.ToInt32(Value) ? Variant.Filled : Variant.Outlined)" OnClick="@(() => Value = (T)Enum.ToObject(Type, value))">
+            <MudButton Color="Color.Primary" Size="Size.Small" DropShadow="false" Variant="@(value == Convert.ToInt32(Value) ? Variant.Filled : Variant.Outlined)" OnClick="@(() => Value = (TEnum)Enum.ToObject(Type, value))">
                 @Enum.GetName(Type, value)
             </MudButton>
         }
