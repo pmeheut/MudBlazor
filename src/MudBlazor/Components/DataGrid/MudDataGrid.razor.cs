@@ -9,6 +9,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
+using MudBlazor.Resources;
 using MudBlazor.Utilities;
 using MudBlazor.Utilities.Clone;
 
@@ -23,6 +24,7 @@ namespace MudBlazor
         MudDataGrid<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T> : MudComponentBase,
         IDisposable
     {
+        [Inject] protected IDialogService DialogService { get; set; }
         private T _selectedItem;
         private MudForm _editForm;
         internal int? _rowsPerPage;
@@ -44,6 +46,9 @@ namespace MudBlazor
         private List<GroupDefinition<T>> _allGroups = [];
         private GridData<T> _serverData = new() { TotalItems = 0, Items = Array.Empty<T>() };
         private Func<IFilterDefinition<T>> _defaultFilterDefinitionFactory = () => new FilterDefinition<T>();
+        private Dictionary<Column<T>, int> _initialIndexByColumn = new();
+        private Dictionary<int, Column<T>> _columnByInitialIndex = new();
+        private DataGridState _initialState = null;
 
         protected string Classname =>
             new CssBuilder("mud-table")
@@ -179,90 +184,102 @@ namespace MudBlazor
         internal static bool RenderedColumnsItemsSelector(Column<T> item, string dropZone) =>
             item?.PropertyName == dropZone;
 
-        public List<ColumnState> GetColumnStates()
+        public DataGridState GetState()
         {
-            return RenderedColumns.Select(c =>
-                    new ColumnState(c.PropertyName, c.Hidden, GetColumnSortDirection(c.PropertyName),
-                        c.HeaderCell.Width))
-                .ToList();
+            try
+            {
+                var columnsState = RenderedColumns.Select(c =>
+                        new ColumnState(_initialIndexByColumn[c], c.Hidden || c.HiddenState.Value,
+                            GetColumnSortDirection(c.PropertyName),
+                            c.Width))
+                    .ToList();
+                return new DataGridState(columnsState);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                // Fail safely
+                return new DataGridState(new List<ColumnState>());
+            }
         }
 
-        public async void SetColumnsStateAsync(List<ColumnState> columnStates)
+        public async Task SetStateAsync(DataGridState state)
         {
-            if (columnStates == null)
-                return;
-
-            var renderedColumnsByName = new Dictionary<string, Column<T>>();
-            foreach (var column in RenderedColumns)
+            try
             {
-                renderedColumnsByName[column.PropertyName] = column;
-            }
+                if (state.ColumnsState == null)
+                    return;
 
-            var renderedColumnsFound = new HashSet<Column<T>>();
-            var orderedColumns = new List<Column<T>>();
-
-            foreach (var columnState in columnStates)
-            {
-                if (renderedColumnsByName.TryGetValue(columnState.Name, out var value))
+                if (_initialState == null)
                 {
-                    orderedColumns.Add(value);
-                    renderedColumnsFound.Add(value);
-                }
-            }
-
-            foreach (var column in RenderedColumns)
-            {
-                if (!renderedColumnsFound.Contains(column))
-                {
-                    orderedColumns.Add(column);
-                }
-            }
-
-            RenderedColumns.Clear();
-            RenderedColumns.AddRange(orderedColumns);
-
-            // TODO: set order, call methods to set width, hidden, sort direction and avoid events
-            foreach (var state in columnStates)
-            {
-                var column = renderedColumnsByName[state.Name];
-                // Update hidden state
-                if (state.Hidden)
-                {
-                    await column.HiddenState.SetValueAsync(true);
-                }
-                else
-                {
-                    await column.HiddenState.SetValueAsync(false);
+                    _initialState = GetState();
                 }
 
-                // Update width
-                if (state.Width.HasValue)
-                {
-                    column.HeaderCell.Width = state.Width;
-                }
+                var renderedColumnsFound = new HashSet<Column<T>>();
+                var orderedColumns = new List<Column<T>>();
 
-                // Update sort direction
-                if (state.SortDirection != SortDirection.None)
+                foreach (var columnState in state.ColumnsState)
                 {
-                    // Remove existing sort definition if it exists
-                    SortDefinitions.Remove(state.Name);
-
-                    // Add new sort definition if not None
-                    if (state.SortDirection != SortDirection.None)
+                    if (_columnByInitialIndex.TryGetValue(columnState.index, out var column))
                     {
-                        await SetSortAsync(column.PropertyName, state.SortDirection, column.GetLocalSortFunc(),
-                            column.Comparer);
+                        orderedColumns.Add(column);
+                        renderedColumnsFound.Add(column);
                     }
                 }
-            }
 
-            // Refresh the UI
-            StateHasChanged();
+                foreach (var column in RenderedColumns)
+                {
+                    if (!renderedColumnsFound.Contains(column))
+                    {
+                        orderedColumns.Add(column);
+                    }
+                }
+
+                RenderedColumns.Clear();
+                RenderedColumns.AddRange(orderedColumns);
+
+                var gridHeight = await GetActualHeight();
+                SortDefinitions.Clear();
+                // TODO: set order, call methods to set width, hidden, sort direction and avoid events
+                foreach (var columnState in state.ColumnsState)
+                {
+                    if (_columnByInitialIndex.TryGetValue(columnState.index, out var column))
+                    {
+                        // Update hidden state
+                        if (columnState.Hidden)
+                        {
+                            await column.HiddenState.SetValueAsync(true);
+                        }
+                        else
+                        {
+                            await column.HiddenState.SetValueAsync(false);
+                        }
+
+                        // Update width
+                        column.Width = columnState.Width;
+
+                        if (columnState.SortDirection != SortDirection.None)
+                        {
+                            // Add new sort definition
+                            SetSort(column.PropertyName, columnState.SortDirection, column.GetLocalSortFunc(),
+                                column.Comparer);
+                        }
+                    }
+                }
+
+                // Refresh the UI
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                // Fail safely
+                StateHasChanged();
+            }
         }
 
-        internal Task FireColumnsStateChangedAsync()
+        internal Task FireColumnsStateChangedAsync(bool reset = false)
         {
-            return ColumnsStateChanged.InvokeAsync(new ColumnsStateEvent());
+            return ColumnsStateChanged.InvokeAsync(new DataGridStateEvent<T>(this, reset));
         }
 
         private static void Swap<TItem>(List<TItem> list, int indexA, int indexB)
@@ -286,13 +303,6 @@ namespace MudBlazor
                 var dragAndDropDestinationIndex = RenderedColumns.IndexOf(dragAndDropDestination);
 
                 Swap(RenderedColumns, dragAndDropSourceIndex, dragAndDropDestinationIndex);
-
-                // swap source / destination
-                var dest = dragAndDropDestination.HeaderCell.Width;
-                var src = dragAndDropSource.HeaderCell.Width;
-
-                dragAndDropSource.HeaderCell.Width = dest;
-                dragAndDropDestination.HeaderCell.Width = src;
 
                 StateHasChanged();
                 return FireColumnsStateChangedAsync();
@@ -404,7 +414,7 @@ namespace MudBlazor
         /// This can be due to their order, visibility, width, or sort direction.
         /// </remarks>
         [Parameter]
-        public EventCallback<ColumnsStateEvent> ColumnsStateChanged { get; set; }
+        public EventCallback<DataGridStateEvent<T>> ColumnsStateChanged { get; set; }
 
         #endregion
 
@@ -1380,6 +1390,19 @@ namespace MudBlazor
             }
 
             await base.OnAfterRenderAsync(firstRender);
+            if (firstRender)
+            {
+                for (int i = 0; i < RenderedColumns.Count; i++)
+                {
+                    _initialIndexByColumn[RenderedColumns[i]] = i;
+                    _columnByInitialIndex[i] = RenderedColumns[i];
+                }
+            }
+
+            if (_initialState == null)
+            {
+                _initialState = GetState();
+            }
         }
 
         public override async Task SetParametersAsync(ParameterView parameters)
@@ -1834,17 +1857,23 @@ namespace MudBlazor
         public async Task SetSortAsync(string field, SortDirection direction, Func<T, object> sortFunc,
             IComparer<object> comparer = null)
         {
-            var removedSortDefinitions = new HashSet<string>(SortDefinitions.Keys);
             SortDefinitions.Clear();
+            var removedSortDefinitions = SetSort(field, direction, sortFunc, comparer);
 
+            await InvokeSortUpdates(SortDefinitions, removedSortDefinitions);
+        }
+
+        private HashSet<string> SetSort(string field, SortDirection direction, Func<T, object> sortFunc,
+            IComparer<object> comparer = null)
+        {
+            var removedSortDefinitions = new HashSet<string>(SortDefinitions.Keys);
             var newDefinition =
                 new SortDefinition<T>(field, direction == SortDirection.Descending, 0, sortFunc, comparer);
             SortDefinitions[field] = newDefinition;
 
             // In case sort is just updated make sure to not mark the field as removed
             removedSortDefinitions.Remove(field);
-
-            await InvokeSortUpdates(SortDefinitions, removedSortDefinitions);
+            return removedSortDefinitions;
         }
 
         /// <summary>
@@ -2099,6 +2128,26 @@ namespace MudBlazor
             StateHasChanged();
         }
 
+        /// <summary>
+        /// Reset the columns to their default state.
+        /// </summary>
+        public async Task ResetColumns()
+        {
+            if (_initialState != null)
+            {
+                var result = await DialogService.ShowMessageBox(
+                    Localizer[LanguageResource.MudDataGrid_Warning],
+                    Localizer[LanguageResource.MudDataGrid_ConfirmReset],
+                    yesText: Localizer[LanguageResource.MudDataGrid_Ok],
+                    cancelText: Localizer[LanguageResource.MudDataGrid_Cancel]);
+                if (result != null && result.Value)
+                {
+                    await SetStateAsync(_initialState);
+                    await FireColumnsStateChangedAsync(true);
+                }
+            }
+        }
+
         private Task ColumnOrderUpdated(MudItemDropInfo<Column<T>> dropItem)
         {
             RenderedColumns.Remove(dropItem.Item);
@@ -2107,7 +2156,7 @@ namespace MudBlazor
             return FireColumnsStateChangedAsync();
         }
 
-        private void ColumnUp(Column<T> column)
+        private Task ColumnUp(Column<T> column)
         {
             var index = RenderedColumns.IndexOf(column);
             if (index > 0)
@@ -2117,9 +2166,10 @@ namespace MudBlazor
             }
 
             DropContainerHasChanged();
+            return FireColumnsStateChangedAsync();
         }
 
-        private void ColumnDown(Column<T> column)
+        private Task ColumnDown(Column<T> column)
         {
             var index = RenderedColumns.IndexOf(column);
             if (index < RenderedColumns.Count - 1)
@@ -2129,6 +2179,7 @@ namespace MudBlazor
             }
 
             DropContainerHasChanged();
+            return FireColumnsStateChangedAsync();
         }
 
         internal void DropContainerHasChanged()

@@ -508,6 +508,7 @@ namespace MudBlazor
 
         internal int SortIndex { get; set; } = -1;
         internal HeaderCell<T> HeaderCell { get; set; }
+        internal double? Width { get; set;}
 
         private Func<T, object> _sortBy;
         internal Func<T, object> groupBy;

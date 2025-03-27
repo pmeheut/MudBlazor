@@ -107,7 +107,14 @@ namespace MudBlazor
         /// <remarks>
         /// Defaults to <c>null</c>.
         /// </remarks>
-        public double? Width { get; internal set; }
+        public double? Width
+        {
+            get => Column?.Width;
+            internal set
+            {
+                if (Column != null) Column.Width = value;
+            }
+        }
 
 
         #region Computed Properties and Functions

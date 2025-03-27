@@ -456,4 +456,16 @@
   <data name="HeatMap_More" xml:space="preserve">
     <value>More</value>
   </data>
+  <data name="MudDataGrid_ResetColumns" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="MudDataGrid_Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="MudDataGrid_ConfirmReset" xml:space="preserve">
+    <value>Confirm Reset?</value>
+  </data>
+  <data name="MudDataGrid_Ok" xml:space="preserve">
+    <value>Ok</value>
+  </data>
 </root>
